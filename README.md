@@ -49,11 +49,18 @@ Run the app from a terminal. The console will show:
 
 | Field           | Description                                       | Default                      |
 |-----------------|---------------------------------------------------|------------------------------|
+| Profile         | Preset that sets Base URL + Model ID together     | `LM Studio`                  |
 | Base URL        | LLM server endpoint                               | `http://localhost:8000/v1`   |
 | Model ID        | Model name passed to the API                      | `HY-MT1.5-1.8B`             |
 | Source language  | Language of the selected text                     | `English`                    |
 | Target language  | Language to translate into                        | `Russian`                    |
 | Hotkey          | Global key combination to trigger translation      | `ctrl+alt+t`                 |
+
+Notes:
+- Each **Profile** keeps its own **Model ID dropdown list**. If you type a new model and press **Save**, it will be added to that profile's list.
+- Default presets:
+  - **LM Studio**: `http://localhost:1234/v1`, model `hy-mt1.5-1.8b`
+  - **Ollama**: `http://localhost:11434/v1`, model `huihui_ai/hy-mt1.5-abliterated:1.8b`
 
 ### Workflow
 
