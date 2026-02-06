@@ -3,19 +3,34 @@ import time
 
 import keyboard
 import pyperclip
+import requests
 
 from translator import translate
+from ollama_client import list_models, pull_model
 
 
 class HotkeyHandler:
     """Manages global hotkey registration and the copy-translate-paste flow."""
 
-    def __init__(self, settings: dict, on_error=None, on_busy_start=None, on_busy_end=None):
+    def __init__(
+        self,
+        settings: dict,
+        on_error=None,
+        on_busy_start=None,
+        on_busy_end=None,
+        on_overlay_message=None,
+        on_overlay_progress=None,
+        on_download_progress=None,
+    ):
         self._settings = dict(settings)
         self._on_error = on_error  # callback(str) for error notifications
         self._on_busy_start = on_busy_start  # callback() when translation begins
         self._on_busy_end = on_busy_end  # callback() when translation ends
+        self._on_overlay_message = on_overlay_message  # callback(str)
+        self._on_overlay_progress = on_overlay_progress  # callback(int|None)
+        self._on_download_progress = on_download_progress  # callback(bool,str,int|None)
         self._hotkey_handle = None
+        self._run_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -50,12 +65,90 @@ class HotkeyHandler:
                 pass
             self._hotkey_handle = None
 
+    def download_model_async(self, base_url: str, model: str) -> None:
+        """Download (pull) an Ollama model in a background thread."""
+        if not self._run_lock.acquire(blocking=False):
+            return
+        threading.Thread(
+            target=self._download_worker,
+            args=(base_url, model),
+            daemon=True,
+        ).start()
+
+    def _is_ollama_profile(self) -> bool:
+        return self._settings.get("active_profile") == "Ollama"
+
+    def _notify_download(self, in_progress: bool, status: str, percent: int | None) -> None:
+        if self._on_download_progress:
+            self._on_download_progress(in_progress, status, percent)
+
+    def _pull_model_with_progress(self, base_url: str, model: str) -> None:
+        if self._on_overlay_message:
+            self._on_overlay_message(f"Downloading model: {model}")
+        if self._on_overlay_progress:
+            self._on_overlay_progress(None)
+        self._notify_download(True, f"Downloading model: {model}", None)
+
+        def on_progress(status: str, percent: int | None) -> None:
+            if self._on_overlay_message:
+                self._on_overlay_message(status)
+            if self._on_overlay_progress:
+                self._on_overlay_progress(percent)
+            self._notify_download(True, status, percent)
+
+        pull_model(base_url=base_url, model=model, on_progress=on_progress)
+
+        if self._on_overlay_progress:
+            self._on_overlay_progress(100)
+        self._notify_download(False, "Download complete", 100)
+
+    def _download_worker(self, base_url: str, model: str) -> None:
+        try:
+            if self._on_busy_start:
+                self._on_busy_start()
+            self._pull_model_with_progress(base_url, model)
+        except Exception as exc:
+            self._notify_download(False, f"Download failed: {exc}", None)
+            if self._on_error:
+                self._on_error(str(exc))
+        finally:
+            if self._on_busy_end:
+                self._on_busy_end()
+            try:
+                self._run_lock.release()
+            except RuntimeError:
+                pass
+
+    def _ensure_ollama_model(self, base_url: str, model: str) -> None:
+        models = list_models(base_url)
+        if model in models:
+            return
+        # Pull the model with progress (blocking inside current worker thread)
+        self._pull_model_with_progress(base_url, model)
+
+    def _is_model_not_found_error(self, exc: Exception, model: str) -> bool:
+        if not isinstance(exc, requests.HTTPError) or exc.response is None:
+            return False
+        try:
+            data = exc.response.json()
+        except Exception:
+            return False
+        if not isinstance(data, dict):
+            return False
+        err = data.get("error")
+        if not isinstance(err, dict):
+            return False
+        msg = err.get("message")
+        return isinstance(msg, str) and ("not found" in msg) and (model in msg)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
     def _on_hotkey(self) -> None:
         """Kick off the translate flow in a background thread."""
+        if not self._run_lock.acquire(blocking=False):
+            return
         threading.Thread(target=self._translate_flow, daemon=True).start()
 
     def _translate_flow(self) -> None:
@@ -91,13 +184,32 @@ class HotkeyHandler:
                 if self._on_busy_start:
                     self._on_busy_start()
 
-                translated = translate(
-                    text=selected_text,
-                    base_url=self._settings["base_url"],
-                    model=self._settings["model"],
-                    source_lang=self._settings["source_lang"],
-                    target_lang=self._settings["target_lang"],
-                )
+                base_url = self._settings["base_url"]
+                model = self._settings["model"]
+
+                if self._is_ollama_profile():
+                    self._ensure_ollama_model(base_url, model)
+
+                try:
+                    translated = translate(
+                        text=selected_text,
+                        base_url=base_url,
+                        model=model,
+                        source_lang=self._settings["source_lang"],
+                        target_lang=self._settings["target_lang"],
+                    )
+                except Exception as exc:
+                    if self._is_ollama_profile() and self._is_model_not_found_error(exc, model):
+                        self._ensure_ollama_model(base_url, model)
+                        translated = translate(
+                            text=selected_text,
+                            base_url=base_url,
+                            model=model,
+                            source_lang=self._settings["source_lang"],
+                            target_lang=self._settings["target_lang"],
+                        )
+                    else:
+                        raise
             finally:
                 if self._on_busy_end:
                     self._on_busy_end()
@@ -117,3 +229,8 @@ class HotkeyHandler:
         except Exception as exc:
             if self._on_error:
                 self._on_error(str(exc))
+        finally:
+            try:
+                self._run_lock.release()
+            except RuntimeError:
+                pass

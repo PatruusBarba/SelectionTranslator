@@ -17,11 +17,14 @@ class TranslatingOverlay:
         # Basic look
         frame = ttk.Frame(self._window, padding=(14, 10))
         frame.grid()
-        self._label_var = tk.StringVar(value="Translating")
-        ttk.Label(frame, textvariable=self._label_var).grid()
+        self._message_var = tk.StringVar(value="Translating")
+        self._detail_var = tk.StringVar(value="")
+        ttk.Label(frame, textvariable=self._message_var).grid(sticky="w")
+        ttk.Label(frame, textvariable=self._detail_var).grid(sticky="w")
 
         self._anim_job = None
         self._anim_step = 0
+        self._indeterminate = True
 
     # ------------------------------------------------------------------
     # Public API (UI thread)
@@ -31,7 +34,9 @@ class TranslatingOverlay:
         self._position_bottom_center()
         self._window.deiconify()
         self._window.lift()
-        self._start_animation()
+        # Default: translating animation
+        self._message_var.set("Translating")
+        self._set_progress(None)
 
     def hide(self) -> None:
         self._stop_animation()
@@ -46,6 +51,12 @@ class TranslatingOverlay:
 
     def hide_threadsafe(self) -> None:
         self._root.after(0, self.hide)
+
+    def set_message_threadsafe(self, text: str) -> None:
+        self._root.after(0, self._message_var.set, text)
+
+    def set_progress_threadsafe(self, percent: int | None) -> None:
+        self._root.after(0, self._set_progress, percent)
 
     # ------------------------------------------------------------------
     # Internal
@@ -62,6 +73,15 @@ class TranslatingOverlay:
         y = screen_h - win_h - self._bottom_padding_px
         self._window.geometry(f"{win_w}x{win_h}+{x}+{y}")
 
+    def _set_progress(self, percent: int | None) -> None:
+        if percent is None:
+            self._indeterminate = True
+            self._start_animation()
+        else:
+            self._indeterminate = False
+            self._stop_animation()
+            self._detail_var.set(f"{int(percent)}%")
+
     def _start_animation(self) -> None:
         if self._anim_job is not None:
             return
@@ -70,7 +90,8 @@ class TranslatingOverlay:
 
     def _tick_animation(self) -> None:
         dots = "." * (self._anim_step % 4)
-        self._label_var.set(f"Translating{dots}")
+        if self._indeterminate:
+            self._detail_var.set(dots)
         self._anim_step += 1
         self._anim_job = self._window.after(250, self._tick_animation)
 

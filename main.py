@@ -90,7 +90,11 @@ def main() -> None:
         on_error=_notify_error,
         on_busy_start=overlay.show_threadsafe,
         on_busy_end=overlay.hide_threadsafe,
+        on_overlay_message=overlay.set_message_threadsafe,
+        on_overlay_progress=overlay.set_progress_threadsafe,
+        on_download_progress=win.set_download_progress_threadsafe,
     )
+    win.set_download_model_callback(handler.download_model_async)
 
     # -- System tray icon ------------------------------------------------
     def on_show_settings(icon, item):  # noqa: ARG001
