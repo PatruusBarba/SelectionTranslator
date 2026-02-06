@@ -55,3 +55,12 @@ The app starts minimized to the system tray. Right-click the tray icon to open *
 | `hotkey_handler.py`  | Global hotkey listener, copy-translate-paste orchestration|
 | `translator.py`      | LLM API call (`/v1/chat/completions`)                    |
 | `settings_manager.py`| Load/save `settings.json`                                |
+
+---
+
+## Features to add
+
+1. [ ] Overlay when translation is generating (preferably with a simple animation).
+2. [ ] Make language selection into a dropbox (with ability to write custom text as input).
+3. [ ] Ollama support.
+4. [ ] Use streaming for LLM and show translation progress (generating text) in overlay.
