@@ -53,14 +53,28 @@ class SettingsWindow:
         row += 1
         ttk.Label(main_frame, text="Source language:").grid(row=row, column=0, sticky="w", pady=4)
         self._source_lang_var = tk.StringVar(value=settings["source_lang"])
-        ttk.Entry(main_frame, textvariable=self._source_lang_var, width=45).grid(
+        self._source_lang_combo = ttk.Combobox(
+            main_frame,
+            textvariable=self._source_lang_var,
+            values=("English", "Russian"),
+            state="normal",
+            width=45,
+        )
+        self._source_lang_combo.grid(
             row=row, column=1, columnspan=2, sticky="ew", pady=4, padx=(8, 0)
         )
 
         row += 1
         ttk.Label(main_frame, text="Target language:").grid(row=row, column=0, sticky="w", pady=4)
         self._target_lang_var = tk.StringVar(value=settings["target_lang"])
-        ttk.Entry(main_frame, textvariable=self._target_lang_var, width=45).grid(
+        self._target_lang_combo = ttk.Combobox(
+            main_frame,
+            textvariable=self._target_lang_var,
+            values=("English", "Russian"),
+            state="normal",
+            width=45,
+        )
+        self._target_lang_combo.grid(
             row=row, column=1, columnspan=2, sticky="ew", pady=4, padx=(8, 0)
         )
 
