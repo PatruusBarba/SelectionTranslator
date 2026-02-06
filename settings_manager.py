@@ -85,7 +85,6 @@ def load_settings() -> dict:
         "model" not in profiles.get("Custom", {}) or profiles["Custom"].get("model") in (None, "")
     ):
         profiles["Custom"]["model"] = legacy_model
-        # Ensure the legacy model appears in the dropdown at least once
         presets = profiles["Custom"].get("model_presets")
         if not isinstance(presets, list):
             presets = []
@@ -103,7 +102,50 @@ def load_settings() -> dict:
     settings["active_profile"] = active_profile
     settings["base_url"] = str(active.get("base_url", settings.get("base_url", "")) or "")
     settings["model"] = str(active.get("model", settings.get("model", "")) or "")
+
+    # Ensure hotkey string is present and normalize legacy "scNN" tokens.
+    hotkey = settings.get("hotkey")
+    if not isinstance(hotkey, str) or not hotkey.strip():
+        hotkey = DEFAULT_SETTINGS["hotkey"]
+    hotkey = _normalize_hotkey(hotkey)
+    settings["hotkey"] = hotkey
+
+    # Remove stale scan-code keys that are no longer used.
+    settings.pop("hotkey_scancodes", None)
+    settings.pop("hotkey_display", None)
+
     return settings
+
+
+# Scan-code → QWERTY key name (for normalizing legacy "scNN" hotkey strings).
+_SC_TO_NAME: dict[int, str] = {
+    16: "q", 17: "w", 18: "e", 19: "r", 20: "t", 21: "y", 22: "u", 23: "i",
+    24: "o", 25: "p", 30: "a", 31: "s", 32: "d", 33: "f", 34: "g", 35: "h",
+    36: "j", 37: "k", 38: "l", 44: "z", 45: "x", 46: "c", 47: "v", 48: "b",
+    49: "n", 50: "m",
+    2: "1", 3: "2", 4: "3", 5: "4", 6: "5", 7: "6", 8: "7", 9: "8", 10: "9", 11: "0",
+    57: "space", 28: "enter", 1: "escape", 15: "tab",
+    59: "f1", 60: "f2", 61: "f3", 62: "f4", 63: "f5", 64: "f6",
+    65: "f7", 66: "f8", 67: "f9", 68: "f10", 87: "f11", 88: "f12",
+    29: "ctrl", 285: "ctrl", 56: "alt", 312: "alt",
+    42: "shift", 54: "shift", 91: "windows", 92: "windows",
+}
+
+
+def _normalize_hotkey(hotkey: str) -> str:
+    """Replace legacy 'scNN' tokens with human-readable QWERTY names."""
+    import re
+    parts = [p.strip().lower() for p in hotkey.split("+") if p.strip()]
+    normalized: list[str] = []
+    for p in parts:
+        m = re.fullmatch(r"sc(\d+)", p)
+        if m:
+            sc = int(m.group(1))
+            name = _SC_TO_NAME.get(sc, p)
+            normalized.append(name)
+        else:
+            normalized.append(p)
+    return "+".join(normalized)
 
 
 def save_settings(settings: dict) -> None:

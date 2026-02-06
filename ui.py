@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 
 import keyboard
 import threading
+import time
 
 from ollama_client import list_models
 
@@ -45,7 +46,6 @@ class SettingsWindow:
         settings = load_settings()
         profiles = settings.get("profiles", {})
         active_profile = settings.get("active_profile", "Custom")
-
         row = 0
 
         ttk.Label(main_frame, text="Profile:").grid(row=row, column=0, sticky="w", pady=4)
@@ -159,7 +159,7 @@ class SettingsWindow:
 
         row += 1
         ttk.Label(main_frame, text="Hotkey:").grid(row=row, column=0, sticky="w", pady=4)
-        self._hotkey_var = tk.StringVar(value=settings["hotkey"])
+        self._hotkey_var = tk.StringVar(value=settings.get("hotkey", "ctrl+alt+t"))
         self._hotkey_entry = ttk.Entry(
             main_frame, textvariable=self._hotkey_var, width=25, state="readonly"
         )
@@ -195,24 +195,96 @@ class SettingsWindow:
             return
         self._recording_hotkey = True
         self._record_btn.configure(text="Press keys...")
-        # Use keyboard.read_hotkey in a thread so the UI doesn't block
-        import threading
-
         threading.Thread(target=self._record_hotkey_thread, daemon=True).start()
 
-    def _record_hotkey_thread(self) -> None:
-        try:
-            hotkey = keyboard.read_hotkey(suppress=False)
-            # Normalize (keyboard lib returns something like 'ctrl+alt+t')
-            self.root.after(0, self._finish_recording, hotkey)
-        except Exception:
-            self.root.after(0, self._finish_recording, None)
+    # Scan-code → QWERTY name map (physical key regardless of layout)
+    _SC_TO_QWERTY: dict[int, str] = {
+        29: "ctrl", 56: "alt", 42: "shift", 54: "shift",
+        91: "windows", 92: "windows",
+        # We also handle left/right ctrl and alt (some keyboards report different codes)
+        285: "ctrl", 312: "alt",
+        # Letters (QWERTY physical scan codes on standard keyboards)
+        16: "q", 17: "w", 18: "e", 19: "r", 20: "t", 21: "y", 22: "u", 23: "i",
+        24: "o", 25: "p", 30: "a", 31: "s", 32: "d", 33: "f", 34: "g", 35: "h",
+        36: "j", 37: "k", 38: "l", 44: "z", 45: "x", 46: "c", 47: "v", 48: "b",
+        49: "n", 50: "m",
+        # Digits
+        2: "1", 3: "2", 4: "3", 5: "4", 6: "5", 7: "6", 8: "7", 9: "8",
+        10: "9", 11: "0",
+        # Misc
+        57: "space", 28: "enter", 1: "escape", 15: "tab",
+        59: "f1", 60: "f2", 61: "f3", 62: "f4", 63: "f5", 64: "f6",
+        65: "f7", 66: "f8", 67: "f9", 68: "f10", 87: "f11", 88: "f12",
+    }
 
-    def _finish_recording(self, hotkey: str | None) -> None:
+    def _record_hotkey_thread(self) -> None:
+        """Record a physical hotkey combo and store it as a QWERTY name string."""
+        captured: dict[int, str] = {}
+        pressed: set[int] = set()
+        last_event_t = time.time()
+        start_t = time.time()
+
+        def on_event(event: keyboard.KeyboardEvent) -> None:
+            nonlocal last_event_t
+            try:
+                last_event_t = time.time()
+                sc = int(getattr(event, "scan_code", 0) or 0)
+                if event.event_type == keyboard.KEY_DOWN:
+                    pressed.add(sc)
+                    if sc not in captured:
+                        # Map scan code → QWERTY name (layout-independent!)
+                        qwerty_name = self._SC_TO_QWERTY.get(sc)
+                        if qwerty_name:
+                            captured[sc] = qwerty_name
+                        else:
+                            # Fallback: use the name reported by `keyboard`, if any
+                            name = getattr(event, "name", "") or ""
+                            if name:
+                                captured[sc] = name.lower()
+                elif event.event_type == keyboard.KEY_UP:
+                    pressed.discard(sc)
+            except Exception:
+                pass
+
+        hook = keyboard.hook(on_event, suppress=False)
+        try:
+            while True:
+                if captured and not pressed and (time.time() - last_event_t) > 0.25:
+                    break
+                if (time.time() - start_t) > 6.0:
+                    break
+                time.sleep(0.01)
+        finally:
+            try:
+                keyboard.unhook(hook)
+            except Exception:
+                pass
+
+        # Build a display string: modifiers first (ctrl, alt, shift, win), then other keys
+        _mod_priority = {"ctrl": 0, "alt": 1, "shift": 2, "windows": 3}
+
+        def sort_key(sc: int) -> tuple[int, int]:
+            name = captured.get(sc, "")
+            return (_mod_priority.get(name, 10), sc)
+
+        ordered = sorted(captured.keys(), key=sort_key)
+        parts = [captured[sc] for sc in ordered]
+        # Deduplicate (e.g. left+right ctrl both map to "ctrl")
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for p in parts:
+            if p not in seen:
+                seen.add(p)
+                deduped.append(p)
+
+        display = "+".join(deduped) if deduped else ""
+        self.root.after(0, self._finish_recording, display)
+
+    def _finish_recording(self, display: str) -> None:
         self._recording_hotkey = False
         self._record_btn.configure(text="Record")
-        if hotkey:
-            self._hotkey_var.set(hotkey)
+        if display:
+            self._hotkey_var.set(display)
 
     # ------------------------------------------------------------------
     # Save / close
@@ -403,10 +475,11 @@ class SettingsWindow:
             # profile schema
             "active_profile": active_profile,
             "profiles": profiles,
+            # hotkey (QWERTY name string, parsed by Windows RegisterHotKey)
+            "hotkey": self._hotkey_var.get().strip(),
             # rest
             "source_lang": self._source_lang_var.get().strip(),
             "target_lang": self._target_lang_var.get().strip(),
-            "hotkey": self._hotkey_var.get().strip(),
         }
 
         if not settings["base_url"]:
@@ -459,5 +532,5 @@ class SettingsWindow:
         self._model_var.set(settings["model"])
         self._source_lang_var.set(settings["source_lang"])
         self._target_lang_var.set(settings["target_lang"])
-        self._hotkey_var.set(settings["hotkey"])
+        self._hotkey_var.set(settings.get("hotkey", "ctrl+alt+t"))
         self._apply_profile_to_fields()
