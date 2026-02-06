@@ -89,4 +89,4 @@ Notes:
 2. [x] Make language selection into a dropbox (with ability to write custom text as input).
 3. [x] Ollama support.
 4. [ ] Use streaming for LLM and show translation progress (generating text) in overlay.
-5. [ ] Make model id drop down with a few predefined values (HY-MT1.5-1.8B for example).
+5. [x] Make model id drop down with a few predefined values (HY-MT1.5-1.8B for example).
