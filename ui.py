@@ -12,16 +12,18 @@ from settings_manager import load_settings, save_settings
 class SettingsWindow:
     """Tkinter settings UI for the Clipboard Translator."""
 
-    def __init__(self, on_settings_saved=None, on_close=None, on_download_model=None):
+    def __init__(self, on_settings_saved=None, on_close=None, on_download_model=None, on_unload_models=None):
         """
         Args:
             on_settings_saved: callback(settings_dict) invoked after Save.
             on_close: callback() invoked when the window is closed (minimize to tray).
             on_download_model: callback(base_url, model) to start download.
+            on_unload_models: callback() to unload models from memory (Ollama).
         """
         self._on_settings_saved = on_settings_saved
         self._on_close = on_close
         self._on_download_model = on_download_model
+        self._on_unload_models = on_unload_models
         self._recording_hotkey = False
         self._download_in_progress = False
         self._model_check_job = None
@@ -99,6 +101,16 @@ class SettingsWindow:
             state="disabled",
         )
         self._download_btn.grid(row=row, column=2, sticky="e", pady=4)
+
+        row += 1
+        self._unload_btn = ttk.Button(
+            main_frame,
+            text="Выгрузить модели из памяти",
+            command=self._on_unload_clicked,
+            state="disabled",
+        )
+        self._unload_btn.grid(row=row, column=1, columnspan=2, sticky="ew", pady=4, padx=(8, 0))
+        self._unload_btn.grid_remove()
 
         row += 1
         self._download_percent_var = tk.StringVar(value="")
@@ -271,7 +283,11 @@ class SettingsWindow:
         if not self._is_ollama_profile_selected():
             self._model_status_var.set("")
             self._download_btn.configure(state="disabled")
+            self._unload_btn.grid_remove()
             return
+        # On Ollama profile: show unload button
+        self._unload_btn.grid()
+        self._unload_btn.configure(state=("disabled" if self._download_in_progress else "normal"))
         if installed:
             self._model_status_var.set("Installed")
             self._download_btn.configure(state="disabled")
@@ -291,6 +307,7 @@ class SettingsWindow:
             self._target_lang_combo.configure(state="normal")
             self._record_btn.configure(state="normal")
             self._save_btn.configure(state="normal")
+            self._unload_btn.configure(state=("normal" if self._is_ollama_profile_selected() else "disabled"))
         else:
             self._profile_combo.configure(state="disabled")
             self._base_url_combo.configure(state="disabled")
@@ -299,6 +316,7 @@ class SettingsWindow:
             self._target_lang_combo.configure(state="disabled")
             self._record_btn.configure(state="disabled")
             self._save_btn.configure(state="disabled")
+            self._unload_btn.configure(state="disabled")
 
     def _on_download_clicked(self) -> None:
         if not self._is_ollama_profile_selected():
@@ -314,8 +332,22 @@ class SettingsWindow:
         self.set_download_progress_threadsafe(True, "Starting download...", None)
         self._on_download_model(base_url, model)
 
+    def _on_unload_clicked(self) -> None:
+        if not self._is_ollama_profile_selected():
+            return
+        if self._download_in_progress:
+            return
+        if not self._on_unload_models:
+            messagebox.showwarning("Unload", "Unload handler is not configured.")
+            return
+        self.set_download_progress_threadsafe(True, "Unloading models from memory...", None)
+        self._on_unload_models()
+
     def set_download_model_callback(self, cb) -> None:
         self._on_download_model = cb
+
+    def set_unload_models_callback(self, cb) -> None:
+        self._on_unload_models = cb
 
     def set_download_progress_threadsafe(self, in_progress: bool, status: str, percent: int | None) -> None:
         self.root.after(0, self._set_download_progress, in_progress, status, percent)

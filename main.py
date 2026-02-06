@@ -95,12 +95,18 @@ def main() -> None:
         on_download_progress=win.set_download_progress_threadsafe,
     )
     win.set_download_model_callback(handler.download_model_async)
+    win.set_unload_models_callback(handler.unload_ollama_models_async)
 
     # -- System tray icon ------------------------------------------------
     def on_show_settings(icon, item):  # noqa: ARG001
         win.root.after(0, win.show)
 
     def on_quit(icon, item):  # noqa: ARG001
+        # Best-effort: unload Ollama models from memory before exiting.
+        try:
+            handler.unload_ollama_models_sync()
+        except Exception:
+            pass
         handler.unregister()
         icon.stop()
         win.root.after(0, win.root.destroy)

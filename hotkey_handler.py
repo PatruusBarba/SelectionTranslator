@@ -6,7 +6,7 @@ import pyperclip
 import requests
 
 from translator import translate
-from ollama_client import list_models, pull_model
+from ollama_client import list_models, pull_model, unload_all_running_models
 
 
 class HotkeyHandler:
@@ -77,6 +77,46 @@ class HotkeyHandler:
 
     def _is_ollama_profile(self) -> bool:
         return self._settings.get("active_profile") == "Ollama"
+
+    def unload_ollama_models_sync(self) -> None:
+        """Unload all running Ollama models from memory (best-effort)."""
+        if not self._is_ollama_profile():
+            return
+        if not self._run_lock.acquire(blocking=False):
+            return
+        try:
+            if self._on_busy_start:
+                self._on_busy_start()
+            if self._on_overlay_message:
+                self._on_overlay_message("Unloading models from memory...")
+            if self._on_overlay_progress:
+                self._on_overlay_progress(None)
+            self._notify_download(True, "Unloading models from memory...", None)
+
+            base_url = self._settings.get("base_url", "")
+            attempted = unload_all_running_models(base_url)
+
+            msg = "Unloaded models." if attempted else "No running models."
+            if self._on_overlay_message:
+                self._on_overlay_message(msg)
+            self._notify_download(False, msg, None)
+        except Exception as exc:
+            self._notify_download(False, f"Unload failed: {exc}", None)
+            if self._on_error:
+                self._on_error(str(exc))
+        finally:
+            if self._on_busy_end:
+                self._on_busy_end()
+            try:
+                self._run_lock.release()
+            except RuntimeError:
+                pass
+
+    def unload_ollama_models_async(self) -> None:
+        """Unload all running Ollama models from memory in a background thread."""
+        if not self._is_ollama_profile():
+            return
+        threading.Thread(target=self.unload_ollama_models_sync, daemon=True).start()
 
     def _notify_download(self, in_progress: bool, status: str, percent: int | None) -> None:
         if self._on_download_progress:
