@@ -1,0 +1,29 @@
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# App local settings (generated at runtime)
+settings.json
+
+# Cursor / IDE metadata
+.cursor/

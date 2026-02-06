@@ -1,0 +1,57 @@
+# Clipboard Translator
+
+A system-tray Python app that translates selected text in any application via a global hotkey. It copies the selection, sends it to an OpenAI-compatible LLM endpoint, and pastes the translation back — replacing the original text.
+
+## Features
+
+- Global hotkey (default `Ctrl+Alt+T`) works in any application
+- Configurable source and target languages
+- Connects to any OpenAI-compatible API (`/v1/chat/completions`)
+- Settings UI built with Tkinter
+- Minimizes to the system tray; error notifications via tray balloon
+- Settings persist to `settings.json`
+
+## Requirements
+
+- Python 3.10+
+- Windows (uses `keyboard` library for global hotkeys and key simulation)
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Usage
+
+```bash
+python main.py
+```
+
+The app starts minimized to the system tray. Right-click the tray icon to open **Settings** or **Quit**.
+
+### Settings
+
+| Field           | Description                                       | Default                      |
+|-----------------|---------------------------------------------------|------------------------------|
+| Base URL        | LLM server endpoint                               | `http://localhost:8000/v1`   |
+| Model ID        | Model name passed to the API                      | `HY-MT1.5-1.8B`             |
+| Source language  | Language of the selected text                     | `English`                    |
+| Target language  | Language to translate into                        | `Russian`                    |
+| Hotkey          | Global key combination to trigger translation      | `ctrl+alt+t`                 |
+
+### Workflow
+
+1. Select text in any application.
+2. Press the hotkey.
+3. The app copies the selection, sends it to the LLM for translation, and pastes the result in place.
+
+## Project Structure
+
+| File                 | Purpose                                                  |
+|----------------------|----------------------------------------------------------|
+| `main.py`            | Entry point, system tray icon, wiring                    |
+| `ui.py`              | Tkinter settings window                                  |
+| `hotkey_handler.py`  | Global hotkey listener, copy-translate-paste orchestration|
+| `translator.py`      | LLM API call (`/v1/chat/completions`)                    |
+| `settings_manager.py`| Load/save `settings.json`                                |
