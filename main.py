@@ -18,6 +18,7 @@ import pystray
 
 from settings_manager import load_settings
 from hotkey_handler import HotkeyHandler
+from overlay import TranslatingOverlay
 from ui import SettingsWindow
 
 
@@ -71,14 +72,25 @@ def main() -> None:
 
     settings = load_settings()
 
-    # -- Hotkey handler --------------------------------------------------
-    handler = HotkeyHandler(settings, on_error=_notify_error)
-
     # -- Settings window (Tkinter) --------------------------------------
+    handler = None  # assigned after overlay is created
+
     def on_settings_saved(new_settings: dict) -> None:
-        handler.update_settings(new_settings)
+        if handler is not None:
+            handler.update_settings(new_settings)
 
     win = SettingsWindow(on_settings_saved=on_settings_saved)
+
+    # -- Translating overlay --------------------------------------------
+    overlay = TranslatingOverlay(win.root, bottom_padding_px=80)
+
+    # -- Hotkey handler --------------------------------------------------
+    handler = HotkeyHandler(
+        settings,
+        on_error=_notify_error,
+        on_busy_start=overlay.show_threadsafe,
+        on_busy_end=overlay.hide_threadsafe,
+    )
 
     # -- System tray icon ------------------------------------------------
     def on_show_settings(icon, item):  # noqa: ARG001
