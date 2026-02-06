@@ -20,7 +20,10 @@ DEFAULT_SETTINGS = {
         "Ollama": {
             "base_url": "http://localhost:11434/v1",
             "model": "huihui_ai/hy-mt1.5-abliterated:1.8b",
-            "model_presets": ["huihui_ai/hy-mt1.5-abliterated:1.8b"],
+            "model_presets": [
+                "huihui_ai/hy-mt1.5-abliterated:1.8b",
+                "huihui_ai/hy-mt1.5-abliterated:7b",
+            ],
         },
         "Custom": {
             "base_url": "http://localhost:1234/v1",
@@ -60,6 +63,16 @@ def load_settings() -> dict:
             for k, v in defaults.items():
                 if k not in profiles[name]:
                     profiles[name][k] = json.loads(json.dumps(v))
+            # merge default model presets (append missing)
+            default_presets = defaults.get("model_presets")
+            if isinstance(default_presets, list):
+                existing_presets = profiles[name].get("model_presets")
+                if not isinstance(existing_presets, list):
+                    existing_presets = []
+                for m in default_presets:
+                    if m and m not in existing_presets:
+                        existing_presets.append(m)
+                profiles[name]["model_presets"] = existing_presets
 
     # If legacy values were present, store them into Custom profile
     legacy_base_url = settings.get("base_url")
