@@ -30,6 +30,21 @@ python main.py
 
 The app starts minimized to the system tray. Right-click the tray icon to open **Settings** or **Quit**.
 
+### Ollama
+
+This app uses an **OpenAI-compatible** Chat Completions API (`/v1/chat/completions`).
+
+- If you use Ollama locally, set **Base URL** to `http://localhost:11434/v1`.
+- Keep **Model ID** as the Ollama model name (for example: `llama3`, `qwen2.5`, etc.).
+
+### Logs (see the exact LLM request)
+
+Run the app from a terminal. The console will show:
+
+- `POST .../chat/completions`
+- The full JSON request payload (including messages)
+- Response status and body
+
 ### Settings
 
 | Field           | Description                                       | Default                      |
@@ -64,3 +79,4 @@ The app starts minimized to the system tray. Right-click the tray icon to open *
 2. [ ] Make language selection into a dropbox (with ability to write custom text as input).
 3. [ ] Ollama support.
 4. [ ] Use streaming for LLM and show translation progress (generating text) in overlay.
+5. [ ] Make model id drop down with a few predefined values (HY-MT1.5-1.8B for example).
