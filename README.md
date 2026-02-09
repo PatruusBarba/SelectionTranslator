@@ -22,6 +22,41 @@ A system-tray Python app that translates selected text in any application via a 
 pip install -r requirements.txt
 ```
 
+## Build Artifact (PyInstaller)
+
+Build a standalone Windows app so end users do not need Python installed.
+
+1. Install PyInstaller:
+
+```bash
+pip install pyinstaller
+```
+
+2. Build from the existing spec file:
+
+```bash
+pyinstaller --noconfirm ClipboardTranslator.spec
+```
+
+3. Output artifact:
+- `dist/ClipboardTranslator/` for `onedir` build (recommended for reliability/startup)
+- `dist/ClipboardTranslator.exe` for `onefile` build (if configured in spec)
+
+Optional direct build commands (without spec):
+
+```bash
+# onedir
+pyinstaller --noconfirm --windowed --onedir --name ClipboardTranslator main.py
+
+# onefile
+pyinstaller --noconfirm --windowed --onefile --name ClipboardTranslator main.py
+```
+
+Notes:
+- Close any running instance of the app before building.
+- Test the built artifact on a clean Windows machine.
+- `settings.json` should remain user-local (do not bundle personal settings into the artifact).
+
 ## Usage
 
 ```bash
