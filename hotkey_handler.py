@@ -174,6 +174,7 @@ class HotkeyHandler:
         on_busy_end=None,
         on_overlay_message=None,
         on_overlay_progress=None,
+        on_overlay_detail=None,
         on_download_progress=None,
     ):
         self._settings = dict(settings)
@@ -182,6 +183,7 @@ class HotkeyHandler:
         self._on_busy_end = on_busy_end
         self._on_overlay_message = on_overlay_message
         self._on_overlay_progress = on_overlay_progress
+        self._on_overlay_detail = on_overlay_detail  # callback(str) for streaming partials
         self._on_download_progress = on_download_progress
         self._run_lock = threading.Lock()
 
@@ -433,6 +435,21 @@ class HotkeyHandler:
                 if self._is_ollama_profile():
                     self._ensure_ollama_model(base_url, model)
 
+                last_ui_update_t = 0.0
+
+                def on_partial(text_so_far: str) -> None:
+                    nonlocal last_ui_update_t
+                    if not self._on_overlay_detail:
+                        return
+                    now = time.time()
+                    if (now - last_ui_update_t) < 0.08:
+                        return
+                    last_ui_update_t = now
+
+                    tail = text_so_far[-80:].replace("\n", " ").strip()
+                    detail = f"{len(text_so_far)} chars — {tail}"
+                    self._on_overlay_detail(detail)
+
                 try:
                     translated = translate(
                         text=selected_text,
@@ -440,6 +457,7 @@ class HotkeyHandler:
                         model=model,
                         source_lang=self._settings["source_lang"],
                         target_lang=self._settings["target_lang"],
+                        on_partial=on_partial,
                     )
                 except Exception as exc:
                     if self._is_ollama_profile() and self._is_model_not_found_error(exc, model):
@@ -450,6 +468,7 @@ class HotkeyHandler:
                             model=model,
                             source_lang=self._settings["source_lang"],
                             target_lang=self._settings["target_lang"],
+                            on_partial=on_partial,
                         )
                     else:
                         raise
