@@ -127,3 +127,4 @@ Notes:
 5. [x] Make model id drop down with a few predefined values (HY-MT1.5-1.8B for example).
 6. [ ] Backward translation keybind.
 7. [ ] Smart language selection keybind?
+8. [ ] Change default port from 8080 to ollama default in release artefact.
