@@ -128,3 +128,5 @@ Notes:
 6. [ ] Backward translation keybind.
 7. [ ] Smart language selection keybind?
 8. [ ] Change default port from 8080 to ollama default in release artefact.
+9. [ ] Customizable prompt for translation.
+10. [ ] Unload model when switching.
