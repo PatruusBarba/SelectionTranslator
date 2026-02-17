@@ -131,3 +131,4 @@ Notes:
 9. [ ] Customizable prompt for translation.
 10. [ ] Unload model when switching.
 11. [ ] Save restore previous copy buffer.
+12. [ ] Option to type out translation as it goes.
