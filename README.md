@@ -132,3 +132,5 @@ Notes:
 10. [ ] Unload model when switching.
 11. [ ] Save restore previous copy buffer.
 12. [ ] Option to type out translation as it goes.
+13. [ ] Option to manualy paste translated text when ready (mb different hotkey?).
+14. [ ] Option for sound effect when translation is done.
