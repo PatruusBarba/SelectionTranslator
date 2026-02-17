@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 ## Build Artifact (PyInstaller)
 
-Build a standalone Windows app so end users do not need Python installed.
+Build a standalone Windows app so you do not need Python installed.
 
 1. Install PyInstaller:
 
@@ -51,11 +51,6 @@ pyinstaller --noconfirm --windowed --onedir --name ClipboardTranslator main.py
 # onefile
 pyinstaller --noconfirm --windowed --onefile --name ClipboardTranslator main.py
 ```
-
-Notes:
-- Close any running instance of the app before building.
-- Test the built artifact on a clean Windows machine.
-- `settings.json` should remain user-local (do not bundle personal settings into the artifact).
 
 ## Usage
 
