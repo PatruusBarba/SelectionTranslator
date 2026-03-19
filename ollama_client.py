@@ -52,6 +52,7 @@ def pull_model(
 
     with requests.post(url, json=payload, stream=True, timeout=60) as resp:
         resp.raise_for_status()
+        resp.encoding = "utf-8"
 
         for raw_line in resp.iter_lines(decode_unicode=True):
             if not raw_line:
