@@ -87,7 +87,8 @@ Run the app from a terminal. The console will show:
 | Model ID        | Model name passed to the API                      | `HY-MT1.5-1.8B`             |
 | Source language  | Language of the selected text                     | `English`                    |
 | Target language  | Language to translate into                        | `Russian`                    |
-| Hotkey          | Global key combination to trigger translation      | `ctrl+alt+t`                 |
+| Hotkey          | Global key combination to trigger forward translation | `ctrl+alt+t`                |
+| Backward Hotkey | Global key combination to trigger backward translation (target → source) | `ctrl+alt+y` |
 
 Notes:
 - Each **Profile** keeps its own **Model ID dropdown list**. If you type a new model and press **Save**, it will be added to that profile's list.
@@ -120,7 +121,7 @@ Notes:
 3. [x] Ollama support.
 4. [x] Use streaming for LLM and show translation progress (generating text) in overlay.
 5. [x] Make model id drop down with a few predefined values (HY-MT1.5-1.8B for example).
-6. [ ] Backward translation keybind.
+6. [x] Backward translation keybind.
 7. [ ] Smart language selection keybind?
 8. [ ] Change default port from 8080 to ollama default in release artefact.
 9. [ ] Customizable prompt for translation.

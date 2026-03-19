@@ -60,7 +60,8 @@ if _IS_WINDOWS:
     WM_HOTKEY = 0x0312
     WM_QUIT = 0x0012
 
-    _HOTKEY_ID = 1  # arbitrary unique id within our thread
+    _HOTKEY_ID_FORWARD = 1
+    _HOTKEY_ID_BACKWARD = 2
 
     # Virtual-key codes for A-Z and digits (layout-independent!)
     _VK_MAP: dict[str, int] = {}
@@ -277,15 +278,16 @@ class HotkeyHandler:
         self.register()
 
     def register(self) -> None:
-        """(Re-)register the global hotkey using the platform-appropriate mechanism."""
+        """(Re-)register the global hotkeys using the platform-appropriate mechanism."""
         self.unregister()
 
         hotkey_str = self._settings.get("hotkey", "ctrl+alt+t")
+        backward_hotkey_str = self._settings.get("backward_hotkey", "ctrl+alt+y")
 
         if _IS_WINDOWS:
-            self._register_windows(hotkey_str)
+            self._register_windows(hotkey_str, backward_hotkey_str)
         else:
-            self._register_linux(hotkey_str)
+            self._register_linux(hotkey_str, backward_hotkey_str)
 
     def unregister(self) -> None:
         """Remove the currently registered hotkey."""
@@ -414,60 +416,67 @@ class HotkeyHandler:
     # ------------------------------------------------------------------
 
     if _IS_WINDOWS:
-        def _register_windows(self, hotkey_str: str) -> None:
-            modifiers, vk = _parse_hotkey_string(hotkey_str)
-            if not vk:
+        def _register_windows(self, hotkey_str: str, backward_hotkey_str: str) -> None:
+            fwd_mod, fwd_vk = _parse_hotkey_string(hotkey_str)
+            bwd_mod, bwd_vk = _parse_hotkey_string(backward_hotkey_str)
+
+            if not fwd_vk:
                 err_msg = f"Could not parse hotkey '{hotkey_str}' — no main key found."
                 log.error(err_msg)
                 if self._on_error:
                     self._on_error(err_msg)
+            if not bwd_vk:
+                err_msg = f"Could not parse backward hotkey '{backward_hotkey_str}' — no main key found."
+                log.error(err_msg)
+                if self._on_error:
+                    self._on_error(err_msg)
+            if not fwd_vk and not bwd_vk:
                 return
 
             self._winhk_registered = threading.Event()
 
-            def _thread_func(mod: int, vk_code: int) -> None:
+            def _thread_func() -> None:
                 tid = _kernel32.GetCurrentThreadId()
                 self._winhk_thread_id = tid
-                log.info(
-                    "Hotkey thread started (tid=%d). Registering hotkey mod=0x%04X vk=0x%04X ...",
-                    tid, mod, vk_code,
-                )
 
-                ok = _user32.RegisterHotKey(None, _HOTKEY_ID, mod | MOD_NOREPEAT, vk_code)
-                if not ok:
-                    err = ctypes.GetLastError()
-                    err_msg = f"RegisterHotKey failed (WinError {err}). Hotkey may be in use."
-                    log.error(err_msg)
-                    if self._on_error:
-                        self._on_error(err_msg)
-                    self._winhk_registered.set()
-                    return
+                if fwd_vk:
+                    log.info("Registering forward hotkey mod=0x%04X vk=0x%04X", fwd_mod, fwd_vk)
+                    ok = _user32.RegisterHotKey(None, _HOTKEY_ID_FORWARD, fwd_mod | MOD_NOREPEAT, fwd_vk)
+                    if not ok:
+                        err = ctypes.GetLastError()
+                        log.error("RegisterHotKey (forward) failed (WinError %d).", err)
 
-                log.info("RegisterHotKey succeeded. Entering message loop.")
+                if bwd_vk:
+                    log.info("Registering backward hotkey mod=0x%04X vk=0x%04X", bwd_mod, bwd_vk)
+                    ok = _user32.RegisterHotKey(None, _HOTKEY_ID_BACKWARD, bwd_mod | MOD_NOREPEAT, bwd_vk)
+                    if not ok:
+                        err = ctypes.GetLastError()
+                        log.error("RegisterHotKey (backward) failed (WinError %d).", err)
+
                 self._winhk_registered.set()
 
                 msg = ctypes.wintypes.MSG()
-                # Blocking GetMessageW loop — proper Windows message pump.
-                # Returns 0 on WM_QUIT, -1 on error.
                 while True:
                     ret = _user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
                     if ret <= 0:
-                        # 0 = WM_QUIT, -1 = error → exit loop
                         log.info("Hotkey message loop exiting (GetMessageW returned %d).", ret)
                         break
-                    if msg.message == WM_HOTKEY and msg.wParam == _HOTKEY_ID:
-                        log.debug("WM_HOTKEY received — triggering translation flow.")
-                        self._on_hotkey()
+                    if msg.message == WM_HOTKEY:
+                        if msg.wParam == _HOTKEY_ID_FORWARD:
+                            log.debug("WM_HOTKEY (forward) received.")
+                            self._on_hotkey()
+                        elif msg.wParam == _HOTKEY_ID_BACKWARD:
+                            log.debug("WM_HOTKEY (backward) received.")
+                            self._on_backward_hotkey()
 
-                _user32.UnregisterHotKey(None, _HOTKEY_ID)
-                log.info("UnregisterHotKey done.")
+                _user32.UnregisterHotKey(None, _HOTKEY_ID_FORWARD)
+                _user32.UnregisterHotKey(None, _HOTKEY_ID_BACKWARD)
+                log.info("UnregisterHotKey done (both forward and backward).")
 
             self._winhk_thread = threading.Thread(
-                target=_thread_func, args=(modifiers, vk), daemon=True
+                target=_thread_func, daemon=True
             )
             self._winhk_thread.start()
-
-            # Wait until registration attempt finishes so errors are reported immediately.
             self._winhk_registered.wait(timeout=3)
 
         def _unregister_windows(self) -> None:
@@ -486,24 +495,33 @@ class HotkeyHandler:
     # ------------------------------------------------------------------
 
     if not _IS_WINDOWS:
-        def _register_linux(self, hotkey_str: str) -> None:
+        def _register_linux(self, hotkey_str: str, backward_hotkey_str: str) -> None:
+            hotkey_map: dict[str, object] = {}
+
             pynput_combo = _hotkey_to_pynput_format(hotkey_str)
-            if not pynput_combo:
-                err_msg = f"Could not parse hotkey '{hotkey_str}'."
-                log.error(err_msg)
-                if self._on_error:
-                    self._on_error(err_msg)
+            if pynput_combo:
+                hotkey_map[pynput_combo] = self._on_hotkey
+                log.info("Forward hotkey pynput format: %s", pynput_combo)
+            else:
+                log.error("Could not parse forward hotkey '%s'.", hotkey_str)
+
+            bwd_combo = _hotkey_to_pynput_format(backward_hotkey_str)
+            if bwd_combo:
+                hotkey_map[bwd_combo] = self._on_backward_hotkey
+                log.info("Backward hotkey pynput format: %s", bwd_combo)
+            else:
+                log.error("Could not parse backward hotkey '%s'.", backward_hotkey_str)
+
+            if not hotkey_map:
                 return
 
             try:
-                self._pynput_listener = _PynputGlobalHotKeys(
-                    {pynput_combo: self._on_hotkey}
-                )
+                self._pynput_listener = _PynputGlobalHotKeys(hotkey_map)
                 self._pynput_listener.daemon = True
                 self._pynput_listener.start()
-                log.info("Registered pynput global hotkey: %s", pynput_combo)
+                log.info("Registered %d pynput global hotkey(s).", len(hotkey_map))
             except Exception as exc:
-                err_msg = f"Failed to register hotkey via pynput: {exc}"
+                err_msg = f"Failed to register hotkeys via pynput: {exc}"
                 log.error(err_msg)
                 if self._on_error:
                     self._on_error(err_msg)
@@ -521,14 +539,22 @@ class HotkeyHandler:
     # ------------------------------------------------------------------
 
     def _on_hotkey(self) -> None:
-        """Kick off the translate flow in a background thread."""
-        log.info("Hotkey triggered!")
+        """Kick off the forward translate flow in a background thread."""
+        log.info("Forward hotkey triggered!")
         if not self._run_lock.acquire(blocking=False):
             log.warning("Hotkey ignored — another operation is in progress.")
             return
-        threading.Thread(target=self._translate_flow, daemon=True).start()
+        threading.Thread(target=self._translate_flow, args=(False,), daemon=True).start()
 
-    def _translate_flow(self) -> None:
+    def _on_backward_hotkey(self) -> None:
+        """Kick off the backward translate flow in a background thread."""
+        log.info("Backward hotkey triggered!")
+        if not self._run_lock.acquire(blocking=False):
+            log.warning("Hotkey ignored — another operation is in progress.")
+            return
+        threading.Thread(target=self._translate_flow, args=(True,), daemon=True).start()
+
+    def _translate_flow(self, backward: bool = False) -> None:
         try:
             # 1. Save current clipboard content
             try:
@@ -577,13 +603,20 @@ class HotkeyHandler:
                     detail = f"{len(text_so_far)} chars — {tail}"
                     self._on_overlay_detail(detail)
 
+                if backward:
+                    src_lang = self._settings["target_lang"]
+                    tgt_lang = self._settings["source_lang"]
+                else:
+                    src_lang = self._settings["source_lang"]
+                    tgt_lang = self._settings["target_lang"]
+
                 try:
                     translated = translate(
                         text=selected_text,
                         base_url=base_url,
                         model=model,
-                        source_lang=self._settings["source_lang"],
-                        target_lang=self._settings["target_lang"],
+                        source_lang=src_lang,
+                        target_lang=tgt_lang,
                         on_partial=on_partial,
                     )
                 except Exception as exc:
@@ -593,8 +626,8 @@ class HotkeyHandler:
                             text=selected_text,
                             base_url=base_url,
                             model=model,
-                            source_lang=self._settings["source_lang"],
-                            target_lang=self._settings["target_lang"],
+                            source_lang=src_lang,
+                            target_lang=tgt_lang,
                             on_partial=on_partial,
                         )
                     else:
