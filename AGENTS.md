@@ -62,8 +62,9 @@ Pre-existing E402 warnings in `main.py` are intentional (logging config before i
 
 ### Key gotchas
 
-- **Hotkey conflict on Linux**: The default hotkey `Ctrl+Alt+T` conflicts with the desktop environment's "open terminal" shortcut. For testing on Linux, either change the hotkey in settings (e.g., to `Ctrl+Alt+Y`) or disable the OS shortcut via `xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>t" -r` (for Xfce).
-- The `keyboard` library (used in `ui.py` for hotkey recording) needs root access on Linux. The "Record" button in Settings may not work without root. The rest of the app works fine without root.
+- **Hotkey conflict on Linux**: The default hotkey `Ctrl+Alt+T` conflicts with the desktop environment's "open terminal" shortcut. Disable it: `xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>t" -r`.
+- **Cyrillic in Mousepad**: Install fonts (`sudo apt-get install fonts-noto`) and set Mousepad encoding to UTF-8 (`xfconf-query -c mousepad -p /preferences/file/default-encoding -n -t string -s "UTF-8"`). Pasting Cyrillic via pynput's Ctrl+V may still show mojibake in Mousepad due to a GTK clipboard MIME type issue. The actual clipboard data is correct UTF-8 — verify with `xclip -o -selection clipboard`. Opening the same text from a file renders properly.
+- The `keyboard` library (used in `ui.py` for hotkey recording) needs root access on Linux. The "Record" button in Settings may not work without root.
 - `pyperclip` needs `xclip` installed on Linux (`sudo apt-get install xclip`).
 - On Linux, `pynput` needs `python3-dev` to build `evdev`. Install via `sudo apt-get install python3-dev`.
 - No automated test suite exists. Verification is done via linting, compile checks, import tests, and manual GUI testing.
