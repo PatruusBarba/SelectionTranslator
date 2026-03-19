@@ -32,25 +32,25 @@ Build a standalone Windows app so you do not need Python installed.
 pip install pyinstaller
 ```
 
-2. Build from the existing spec file:
+2. Build (choose one):
+
+**Option A — direct command (recommended):**
+
+```bash
+pyinstaller --noconfirm --windowed --onedir --contents-directory . --name ClipboardTranslator main.py
+```
+
+**Option B — from spec file:**
 
 ```bash
 pyinstaller --noconfirm ClipboardTranslator.spec
 ```
 
 3. Output artifact:
-- `dist/ClipboardTranslator/` for `onedir` build (recommended for reliability/startup)
-- `dist/ClipboardTranslator.exe` for `onefile` build (if configured in spec)
+- `dist/ClipboardTranslator/` — папка с exe и всеми DLL (запускать `ClipboardTranslator.exe` из неё)
+- Для onefile: `dist/ClipboardTranslator.exe` (если собран с `--onefile`)
 
-Optional direct build commands (without spec):
-
-```bash
-# onedir
-pyinstaller --noconfirm --windowed --onedir --name ClipboardTranslator main.py
-
-# onefile
-pyinstaller --noconfirm --windowed --onefile --name ClipboardTranslator main.py
-```
+> **Важно:** `--contents-directory .` кладёт все зависимости рядом с exe (без подпапки `_internal`). Это устраняет ошибку «Failed to load Python DLL» на Python 3.13 и при переносе папки билда.
 
 ## Usage
 
