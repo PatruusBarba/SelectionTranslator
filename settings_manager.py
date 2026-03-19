@@ -10,6 +10,7 @@ DEFAULT_SETTINGS = {
     "source_lang": "English",
     "target_lang": "Russian",
     "hotkey": "ctrl+alt+t",
+    "backward_hotkey": "ctrl+alt+y",
     "active_profile": "LM Studio",
     "profiles": {
         "LM Studio": {
@@ -109,6 +110,12 @@ def load_settings() -> dict:
         hotkey = DEFAULT_SETTINGS["hotkey"]
     hotkey = _normalize_hotkey(hotkey)
     settings["hotkey"] = hotkey
+
+    backward_hotkey = settings.get("backward_hotkey")
+    if not isinstance(backward_hotkey, str) or not backward_hotkey.strip():
+        backward_hotkey = DEFAULT_SETTINGS["backward_hotkey"]
+    backward_hotkey = _normalize_hotkey(backward_hotkey)
+    settings["backward_hotkey"] = backward_hotkey
 
     # Remove stale scan-code keys that are no longer used.
     settings.pop("hotkey_scancodes", None)

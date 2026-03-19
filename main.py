@@ -5,6 +5,7 @@ Global hotkey is registered on startup.
 """
 
 import logging
+import sys
 import threading
 
 logging.basicConfig(
@@ -127,8 +128,10 @@ def main() -> None:
     # Register hotkey now that everything is wired up
     handler.register()
 
-    # Hide the settings window on start (tray only)
-    win.root.withdraw()
+    # Hide the settings window on start (tray only).
+    # Use --show-settings to keep the window visible (useful on Linux without a system tray).
+    if "--show-settings" not in sys.argv:
+        win.root.withdraw()
 
     # Run pystray in its own thread so Tkinter mainloop stays on the main thread
     tray_thread = threading.Thread(target=_tray_icon.run, daemon=True)

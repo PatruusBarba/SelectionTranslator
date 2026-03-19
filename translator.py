@@ -51,6 +51,7 @@ def translate(
 
 def _translate_non_stream(url: str, payload: dict) -> str:
     response = requests.post(url, json=payload, timeout=30)
+    response.encoding = "utf-8"
 
     log.info("Response status: %s", response.status_code)
     log.debug("Response body:\n%s", response.text)
@@ -74,6 +75,7 @@ def _translate_streaming(url: str, payload: dict, on_partial: Callable[[str], No
 
     # Long reads are expected during generation.
     response = requests.post(url, json=payload, stream=True, timeout=(10, 300))
+    response.encoding = "utf-8"
     log.info("Streaming response status: %s", response.status_code)
     response.raise_for_status()
 

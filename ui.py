@@ -169,6 +169,20 @@ class SettingsWindow:
         )
         self._record_btn.grid(row=row, column=2, sticky="e", pady=4)
 
+        row += 1
+        ttk.Label(main_frame, text="Backward Hotkey:").grid(row=row, column=0, sticky="w", pady=4)
+        self._backward_hotkey_var = tk.StringVar(
+            value=settings.get("backward_hotkey", "ctrl+alt+y")
+        )
+        self._backward_hotkey_entry = ttk.Entry(
+            main_frame, textvariable=self._backward_hotkey_var, width=25, state="readonly"
+        )
+        self._backward_hotkey_entry.grid(row=row, column=1, sticky="ew", pady=4, padx=(8, 4))
+        self._backward_record_btn = ttk.Button(
+            main_frame, text="Record", command=self._start_backward_recording
+        )
+        self._backward_record_btn.grid(row=row, column=2, sticky="e", pady=4)
+
         # -- Buttons --------------------------------------------------------
         row += 1
         btn_frame = ttk.Frame(main_frame)
@@ -190,12 +204,28 @@ class SettingsWindow:
     # ------------------------------------------------------------------
 
     def _start_recording(self) -> None:
-        """Enter hotkey-recording mode: wait for a key combo, then store it."""
+        """Enter hotkey-recording mode for the forward hotkey."""
         if self._recording_hotkey:
             return
         self._recording_hotkey = True
         self._record_btn.configure(text="Press keys...")
-        threading.Thread(target=self._record_hotkey_thread, daemon=True).start()
+        threading.Thread(
+            target=self._record_hotkey_thread,
+            args=(self._hotkey_var, self._record_btn),
+            daemon=True,
+        ).start()
+
+    def _start_backward_recording(self) -> None:
+        """Enter hotkey-recording mode for the backward hotkey."""
+        if self._recording_hotkey:
+            return
+        self._recording_hotkey = True
+        self._backward_record_btn.configure(text="Press keys...")
+        threading.Thread(
+            target=self._record_hotkey_thread,
+            args=(self._backward_hotkey_var, self._backward_record_btn),
+            daemon=True,
+        ).start()
 
     # Scan-code → QWERTY name map (physical key regardless of layout)
     _SC_TO_QWERTY: dict[int, str] = {
@@ -217,7 +247,7 @@ class SettingsWindow:
         65: "f7", 66: "f8", 67: "f9", 68: "f10", 87: "f11", 88: "f12",
     }
 
-    def _record_hotkey_thread(self) -> None:
+    def _record_hotkey_thread(self, target_var: tk.StringVar, target_btn: ttk.Button) -> None:
         """Record a physical hotkey combo and store it as a QWERTY name string."""
         captured: dict[int, str] = {}
         pressed: set[int] = set()
@@ -232,12 +262,10 @@ class SettingsWindow:
                 if event.event_type == keyboard.KEY_DOWN:
                     pressed.add(sc)
                     if sc not in captured:
-                        # Map scan code → QWERTY name (layout-independent!)
                         qwerty_name = self._SC_TO_QWERTY.get(sc)
                         if qwerty_name:
                             captured[sc] = qwerty_name
                         else:
-                            # Fallback: use the name reported by `keyboard`, if any
                             name = getattr(event, "name", "") or ""
                             if name:
                                 captured[sc] = name.lower()
@@ -260,7 +288,6 @@ class SettingsWindow:
             except Exception:
                 pass
 
-        # Build a display string: modifiers first (ctrl, alt, shift, win), then other keys
         _mod_priority = {"ctrl": 0, "alt": 1, "shift": 2, "windows": 3}
 
         def sort_key(sc: int) -> tuple[int, int]:
@@ -269,7 +296,6 @@ class SettingsWindow:
 
         ordered = sorted(captured.keys(), key=sort_key)
         parts = [captured[sc] for sc in ordered]
-        # Deduplicate (e.g. left+right ctrl both map to "ctrl")
         seen: set[str] = set()
         deduped: list[str] = []
         for p in parts:
@@ -278,13 +304,13 @@ class SettingsWindow:
                 deduped.append(p)
 
         display = "+".join(deduped) if deduped else ""
-        self.root.after(0, self._finish_recording, display)
+        self.root.after(0, self._finish_recording, display, target_var, target_btn)
 
-    def _finish_recording(self, display: str) -> None:
+    def _finish_recording(self, display: str, target_var: tk.StringVar, target_btn: ttk.Button) -> None:
         self._recording_hotkey = False
-        self._record_btn.configure(text="Record")
+        target_btn.configure(text="Record")
         if display:
-            self._hotkey_var.set(display)
+            target_var.set(display)
 
     # ------------------------------------------------------------------
     # Save / close
@@ -378,6 +404,7 @@ class SettingsWindow:
             self._source_lang_combo.configure(state="normal")
             self._target_lang_combo.configure(state="normal")
             self._record_btn.configure(state="normal")
+            self._backward_record_btn.configure(state="normal")
             self._save_btn.configure(state="normal")
             self._unload_btn.configure(state=("normal" if self._is_ollama_profile_selected() else "disabled"))
         else:
@@ -387,6 +414,7 @@ class SettingsWindow:
             self._source_lang_combo.configure(state="disabled")
             self._target_lang_combo.configure(state="disabled")
             self._record_btn.configure(state="disabled")
+            self._backward_record_btn.configure(state="disabled")
             self._save_btn.configure(state="disabled")
             self._unload_btn.configure(state="disabled")
 
@@ -475,8 +503,8 @@ class SettingsWindow:
             # profile schema
             "active_profile": active_profile,
             "profiles": profiles,
-            # hotkey (QWERTY name string, parsed by Windows RegisterHotKey)
             "hotkey": self._hotkey_var.get().strip(),
+            "backward_hotkey": self._backward_hotkey_var.get().strip(),
             # rest
             "source_lang": self._source_lang_var.get().strip(),
             "target_lang": self._target_lang_var.get().strip(),
@@ -533,4 +561,5 @@ class SettingsWindow:
         self._source_lang_var.set(settings["source_lang"])
         self._target_lang_var.set(settings["target_lang"])
         self._hotkey_var.set(settings.get("hotkey", "ctrl+alt+t"))
+        self._backward_hotkey_var.set(settings.get("backward_hotkey", "ctrl+alt+y"))
         self._apply_profile_to_fields()
