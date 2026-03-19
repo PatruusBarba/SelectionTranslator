@@ -29,15 +29,26 @@ DISPLAY=:1 python3 main.py --show-settings
 - pystray will log "Failed to dock icon" errors — this is expected and non-blocking.
 - The global hotkey (default `Ctrl+Alt+T`) is registered via `pynput.keyboard.GlobalHotKeys`.
 
-### Mock LLM server for testing
+### Running Ollama for real translations
 
-Use `mock_llm_server.py` on port 1234 to test translations without a real LLM:
+Start Ollama and pull the default translation model:
+
+```bash
+ollama serve &
+ollama pull huihui_ai/hy-mt1.5-abliterated:1.8b
+```
+
+The app's "Ollama" profile is pre-configured to `http://localhost:11434/v1` with this model. Ollama runs on CPU in the Cloud Agent VM; translation takes ~5-10 seconds per sentence.
+
+### Mock LLM server (optional)
+
+Use `mock_llm_server.py` on port 1234 for fast testing without a real model:
 
 ```bash
 python3 mock_llm_server.py
 ```
 
-The default "LM Studio" profile points to `http://localhost:1234/v1`, which matches this mock server.
+Switch the app to the "LM Studio" profile (`http://localhost:1234/v1`) to use it.
 
 ### Linting
 
