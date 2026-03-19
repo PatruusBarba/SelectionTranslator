@@ -51,6 +51,7 @@ Pre-existing E402 warnings in `main.py` are intentional (logging config before i
 
 ### Key gotchas
 
+- **Hotkey conflict on Linux**: The default hotkey `Ctrl+Alt+T` conflicts with the desktop environment's "open terminal" shortcut. For testing on Linux, either change the hotkey in settings (e.g., to `Ctrl+Alt+Y`) or disable the OS shortcut via `xfconf-query -c xfce4-keyboard-shortcuts -p "/commands/custom/<Primary><Alt>t" -r` (for Xfce).
 - The `keyboard` library (used in `ui.py` for hotkey recording) needs root access on Linux. The "Record" button in Settings may not work without root. The rest of the app works fine without root.
 - `pyperclip` needs `xclip` installed on Linux (`sudo apt-get install xclip`).
 - On Linux, `pynput` needs `python3-dev` to build `evdev`. Install via `sudo apt-get install python3-dev`.
