@@ -7,7 +7,7 @@ import pyperclip
 import requests
 
 from translator import translate
-from ollama_client import list_models, pull_model, unload_all_running_models
+from ollama_client import list_models, pull_model, unload_model, unload_all_running_models
 
 log = logging.getLogger(__name__)
 
@@ -274,8 +274,46 @@ class HotkeyHandler:
 
     def update_settings(self, settings: dict) -> None:
         """Apply new settings and re-register the hotkey."""
+        old = self._settings
         self._settings = dict(settings)
         self.register()
+        self._maybe_unload_on_switch(old, self._settings)
+
+    def _maybe_unload_on_switch(self, old: dict, new: dict) -> None:
+        """Unload the previous Ollama model if the profile or model changed."""
+        if not new.get("unload_on_switch", True):
+            return
+        old_profile = old.get("active_profile", "")
+        old_model = old.get("model", "")
+        old_base_url = old.get("base_url", "")
+        new_profile = new.get("active_profile", "")
+        new_model = new.get("model", "")
+
+        if old_profile != "Ollama":
+            return
+        if old_profile == new_profile and old_model == new_model:
+            return
+        if not old_model or not old_base_url:
+            return
+
+        log.info(
+            "Model switch detected (profile %s→%s, model %s→%s). "
+            "Unloading old model.",
+            old_profile, new_profile, old_model, new_model,
+        )
+        threading.Thread(
+            target=self._unload_single_model,
+            args=(old_base_url, old_model),
+            daemon=True,
+        ).start()
+
+    def _unload_single_model(self, base_url: str, model: str) -> None:
+        """Unload a specific model from Ollama (best-effort, background)."""
+        try:
+            unload_model(base_url, model)
+            log.info("Unloaded model %r from memory.", model)
+        except Exception as exc:
+            log.warning("Failed to unload model %r: %s", model, exc)
 
     def register(self) -> None:
         """(Re-)register the global hotkeys using the platform-appropriate mechanism."""

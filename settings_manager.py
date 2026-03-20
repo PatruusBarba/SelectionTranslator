@@ -11,6 +11,7 @@ DEFAULT_SETTINGS = {
     "target_lang": "Russian",
     "hotkey": "ctrl+alt+t",
     "backward_hotkey": "ctrl+alt+y",
+    "unload_on_switch": True,
     "active_profile": "LM Studio",
     "profiles": {
         "LM Studio": {

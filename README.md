@@ -125,7 +125,7 @@ Notes:
 7. [ ] Smart language selection keybind?
 8. [ ] Change default port from 8080 to ollama default in release artefact.
 9. [ ] Customizable prompt for translation.
-10. [ ] Unload model when switching.
+10. [x] Unload model when switching.
 11. [ ] Save restore previous copy buffer.
 12. [ ] Option to type out translation as it goes.
 13. [ ] Option to manualy paste translated text when ready (mb different hotkey?).

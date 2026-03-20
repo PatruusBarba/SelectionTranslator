@@ -113,6 +113,20 @@ class SettingsWindow:
         self._unload_btn.grid_remove()
 
         row += 1
+        self._unload_on_switch_var = tk.BooleanVar(
+            value=settings.get("unload_on_switch", True)
+        )
+        self._unload_on_switch_cb = ttk.Checkbutton(
+            main_frame,
+            text="Unload model on switch",
+            variable=self._unload_on_switch_var,
+        )
+        self._unload_on_switch_cb.grid(
+            row=row, column=1, columnspan=2, sticky="w", pady=4, padx=(8, 0)
+        )
+        self._unload_on_switch_cb.grid_remove()
+
+        row += 1
         self._download_percent_var = tk.StringVar(value="")
         self._download_progress_var = tk.IntVar(value=0)
         self._download_progress = ttk.Progressbar(
@@ -382,9 +396,11 @@ class SettingsWindow:
             self._model_status_var.set("")
             self._download_btn.configure(state="disabled")
             self._unload_btn.grid_remove()
+            self._unload_on_switch_cb.grid_remove()
             return
-        # On Ollama profile: show unload button
+        # On Ollama profile: show unload button and switch checkbox
         self._unload_btn.grid()
+        self._unload_on_switch_cb.grid()
         self._unload_btn.configure(state=("disabled" if self._download_in_progress else "normal"))
         if installed:
             self._model_status_var.set("Installed")
@@ -505,6 +521,7 @@ class SettingsWindow:
             "profiles": profiles,
             "hotkey": self._hotkey_var.get().strip(),
             "backward_hotkey": self._backward_hotkey_var.get().strip(),
+            "unload_on_switch": self._unload_on_switch_var.get(),
             # rest
             "source_lang": self._source_lang_var.get().strip(),
             "target_lang": self._target_lang_var.get().strip(),
@@ -562,4 +579,5 @@ class SettingsWindow:
         self._target_lang_var.set(settings["target_lang"])
         self._hotkey_var.set(settings.get("hotkey", "ctrl+alt+t"))
         self._backward_hotkey_var.set(settings.get("backward_hotkey", "ctrl+alt+y"))
+        self._unload_on_switch_var.set(settings.get("unload_on_switch", True))
         self._apply_profile_to_fields()
