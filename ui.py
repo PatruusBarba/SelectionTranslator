@@ -371,6 +371,8 @@ class SettingsWindow:
         if not self._is_ollama_profile_selected():
             self._model_status_var.set("")
             self._download_btn.configure(state="disabled")
+            self._unload_btn.grid_remove()
+            self._unload_on_switch_cb.grid_remove()
             return
 
         base_url = self._base_url_var.get().strip()
